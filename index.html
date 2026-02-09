@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DexPro - MetaMask Base Zero Fee</title>
+    <title>DexPro Futures - Base Simulation</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -18,35 +18,46 @@
         
         /* Animasi Loading Awal */
         #root:empty::before {
-            content: 'Menghubungkan ke Base...';
+            content: 'Initializing Futures Protocol...';
             display: flex;
             height: 100vh;
             justify-content: center;
             align-items: center;
-            color: #0052ff; /* Base Blue */
+            color: #0052ff;
             font-family: sans-serif;
             font-size: 0.875rem;
         }
 
-        /* Modal Backdrop */
-        .modal-backdrop {
-            background-color: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(4px);
-        }
-
-        /* Toast Animation */
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
+        .modal-backdrop { background-color: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         .toast-enter { animation: slideIn 0.3s ease-out forwards; }
         
-        /* Pulse Effect */
-        .flash-green { color: #4ade80; transition: color 0.3s; }
-        .flash-red { color: #f87171; transition: color 0.3s; }
+        /* PnL Colors */
+        .text-pnl-green { color: #2ebd85; }
+        .text-pnl-red { color: #f6465d; }
         
-        /* Base Gradient Text */
-        .text-base-blue { color: #0052ff; }
+        /* Leverage Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #0052ff;
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #374151;
+            border-radius: 2px;
+        }
     </style>
 
     <!-- IMPORT MAP -->
@@ -71,9 +82,9 @@
         import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
         import { ethers, BrowserProvider, parseEther, formatEther } from 'ethers';
 
-        // --- KONFIGURASI NETWORK: BASE SEPOLIA ---
+        // --- KONFIGURASI BASE ---
         const BASE_NETWORK = {
-            chainId: '0x14a34', // 84532 Desimal
+            chainId: '0x14a34',
             chainName: 'Base Sepolia',
             nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
             rpcUrls: ['https://sepolia.base.org'],
@@ -83,392 +94,431 @@
         // --- ICONS ---
         const IconActivity = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>;
         const IconMenu = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;
-        const IconSettings = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>;
-        const IconArrowDownUp = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>;
-        const IconChevronDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
-        const IconExternalLink = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>;
-        const IconRefresh = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>;
         const IconGift = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>;
-        const IconBolt = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>;
-        
-        // --- METAMASK ICON ---
-        const IconMetaMask = () => (
-            <svg viewBox="0 0 32 32" width="22" height="22">
-                <path fill="#E17726" d="M29.62 12.44L26.06 0l-1.66 4.67-4.83.62L16 1.13 12.42 5.3l-4.82-.62L5.94 0 2.38 12.44A5.57 5.57 0 0 0 0 17.13v3.29l9.31 9.9 6.69 1.67 6.69-1.67 9.31-9.9v-3.29a5.57 5.57 0 0 0-2.38-4.69zM7.22 19.46l-2.58-1.55 1.34-4.86 3.1 3.51-1.86 2.9zm6.05 4.38L10.5 21l-.73-3.69 3.5-1.92 3.73 1.92-.73 3.69-2.77 2.84zm7.51-4.38l-1.86-2.9 3.1-3.51 1.34 4.86-2.58 1.55z"/>
-            </svg>
-        );
+        const IconMetaMask = () => (<svg viewBox="0 0 32 32" width="22" height="22"><path fill="#E17726" d="M29.62 12.44L26.06 0l-1.66 4.67-4.83.62L16 1.13 12.42 5.3l-4.82-.62L5.94 0 2.38 12.44A5.57 5.57 0 0 0 0 17.13v3.29l9.31 9.9 6.69 1.67 6.69-1.67 9.31-9.9v-3.29a5.57 5.57 0 0 0-2.38-4.69zM7.22 19.46l-2.58-1.55 1.34-4.86 3.1 3.51-1.86 2.9zm6.05 4.38L10.5 21l-.73-3.69 3.5-1.92 3.73 1.92-.73 3.69-2.77 2.84zm7.51-4.38l-1.86-2.9 3.1-3.51 1.34 4.86-2.58 1.55z"/></svg>);
+        const IconTrendingUp = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-pnl-green"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>;
+        const IconTrendingDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-pnl-red"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>;
 
-        const PAIR_ADDRESS = '0x2287a9620adcbf6250dc71be9ee9b2d3a1ec85a464fc6f5c06669e8d07b61bba';
+        const PAIR_ADDRESS = '0x2287a9620adcbf6250dc71be9ee9b2d3a1ec85a464fc6f5c06669e8d07b61bba'; // ETH-USDC
         const API_URL = `https://api.dexscreener.com/latest/dex/pairs/ethereum/${PAIR_ADDRESS}`;
 
         function App() {
-            // State
+            // --- WALLET STATE ---
             const [account, setAccount] = useState('');
             const [provider, setProvider] = useState(null);
             
-            const [realBalance, setRealBalance] = useState(0);
-            const [mockBalance, setMockBalance] = useState(0);
+            // --- TRADING STATE ---
+            const [mockUsdcBalance, setMockUsdcBalance] = useState(10000); // Modal Awal Simulasi $10,000
+            const [leverage, setLeverage] = useState(10);
+            const [marginAmount, setMarginAmount] = useState('');
+            const [tradeSide, setTradeSide] = useState('Long'); // 'Long' or 'Short'
+            const [positions, setPositions] = useState([]); // Array of Active Positions
             
-            const [networkName, setNetworkName] = useState('');
-            const [marketData, setMarketData] = useState({
-                priceUsd: 0, priceChange: 0, volume24h: 0, marketCap: 0, pairName: 'ETH/USDC', loading: true
-            });
+            // --- MARKET DATA ---
+            const [marketData, setMarketData] = useState({ priceUsd: 0, priceChange: 0, loading: true });
             const [chartData, setChartData] = useState([]);
-            const [currentTimeFrame, setCurrentTimeFrame] = useState('1H');
-            const [inputToken, setInputToken] = useState('ETH');
-            const [outputToken, setOutputToken] = useState('USDC');
-            const [inputAmount, setInputAmount] = useState('');
-            const [outputAmount, setOutputAmount] = useState('');
-            const [priceFlash, setPriceFlash] = useState('');
             const [toasts, setToasts] = useState([]);
-            const [isSwapping, setIsSwapping] = useState(false);
-            const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
             const [isFaucetLoading, setIsFaucetLoading] = useState(false);
 
-            const prevPriceRef = useRef(0);
             const lastChartPointRef = useRef(null);
 
-            const totalDisplayBalance = (realBalance + mockBalance).toFixed(4);
-
+            // --- HELPER: TOAST ---
             const addToast = (msg, type = 'success') => {
                 const id = Date.now();
                 setToasts(prev => [...prev, { id, msg, type }]);
                 setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
             };
 
+            // --- WALLET CONNECTION (METAMASK) ---
             useEffect(() => {
                 if (window.ethereum) {
                     const newProvider = new BrowserProvider(window.ethereum);
                     setProvider(newProvider);
-                    
                     window.ethereum.request({ method: 'eth_accounts' })
-                        .then(accounts => {
-                            if (accounts.length > 0) handleAccountsChanged(accounts, newProvider);
-                        });
-
-                    window.ethereum.on('accountsChanged', (accs) => handleAccountsChanged(accs, newProvider));
-                    window.ethereum.on('chainChanged', () => window.location.reload());
+                        .then(accs => { if(accs.length) setAccount(accs[0]); });
+                    window.ethereum.on('accountsChanged', (accs) => setAccount(accs[0] || ''));
                 }
             }, []);
 
-            const handleAccountsChanged = async (accounts, currentProvider) => {
-                if (accounts.length === 0) {
-                    setAccount('');
-                    setRealBalance(0);
-                    addToast('MetaMask Terputus', 'info');
-                } else {
-                    setAccount(accounts[0]);
-                    updateBalance(accounts[0], currentProvider);
-                    addToast(`Terhubung: ${accounts[0].slice(0,6)}...`, 'success');
-                    
-                    const network = await currentProvider.getNetwork();
-                    setNetworkName(Number(network.chainId) === 84532 ? 'Base Sepolia' : `Chain ID: ${network.chainId}`);
-                }
-            };
-
-            const updateBalance = async (address, currentProvider) => {
-                if (!currentProvider) return;
-                try {
-                    const bal = await currentProvider.getBalance(address);
-                    setRealBalance(parseFloat(formatEther(bal)));
-                } catch (e) { console.error("Balance err", e); }
-            };
-
             const connectMetaMask = async () => {
-                if (!window.ethereum) {
-                    window.open('https://metamask.io/', '_blank');
-                    addToast('Silakan instal MetaMask!', 'error');
-                    return;
-                }
-                
+                if (!window.ethereum) return window.open('https://metamask.io/', '_blank');
                 try {
                     await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    
+                    // Switch to Base Sepolia (Optional for UI consistency, though we use mock USDC)
                     try {
-                        await window.ethereum.request({
-                            method: 'wallet_switchEthereumChain',
-                            params: [{ chainId: BASE_NETWORK.chainId }],
-                        });
-                    } catch (switchError) {
-                        if (switchError.code === 4902) {
-                            try {
-                                await window.ethereum.request({
-                                    method: 'wallet_addEthereumChain',
-                                    params: [BASE_NETWORK],
-                                });
-                            } catch (addError) {
-                                addToast('Gagal menambahkan Network Base', 'error');
-                            }
-                        }
-                    }
-                } catch (error) {
-                    addToast('Koneksi Ditolak', 'error');
-                }
+                        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BASE_NETWORK.chainId }] });
+                    } catch (e) { /* Ignore switch error for simulation */ }
+                } catch (e) { addToast('Koneksi Ditolak', 'error'); }
             };
 
-            const handleFaucet = () => {
-                if (!account) { connectMetaMask(); return; }
-                if (isFaucetLoading) return;
-                setIsFaucetLoading(true);
-                addToast('Mining 1 Mock ETH (Base)...', 'info');
-                setTimeout(() => {
-                    setMockBalance(prev => prev + 1);
-                    setIsFaucetLoading(false);
-                    addToast('🎁 1 ETH (Mock) ditambahkan!', 'success');
-                }, 2000);
+            // --- FUTURES LOGIC ---
+            const calculatePositionSize = () => {
+                const margin = parseFloat(marginAmount) || 0;
+                return margin * leverage;
             };
 
-            // --- ZERO FEE SWAP LOGIC (SIGNATURE BASED) ---
-            const handleSwap = async () => {
-                if (!account) { connectMetaMask(); return; }
-                if (!inputAmount) return;
+            const handleOpenPosition = async () => {
+                if (!account) return connectMetaMask();
+                const margin = parseFloat(marginAmount);
+                if (!margin || margin <= 0) return addToast('Masukkan jumlah margin valid', 'error');
+                if (margin > mockUsdcBalance) return addToast('Saldo Insufficient (Mock USDC)', 'error');
 
-                setIsSwapping(true);
-                
+                // 1. Gasless Signature Simulation (Zero Fee)
                 try {
                     const signer = await provider.getSigner();
+                    addToast('Menandatangani Order Futures...', 'info');
                     
-                    addToast('Memproses Transaksi Bebas Gas (MetaMask)...', 'info');
-                    
-                    const message = `Zero Fee Swap on Base:\n\nSell: ${inputAmount} ${inputToken}\nBuy: ${outputAmount} ${outputToken}\nFee: 0 ETH\n\n(Signed for Gasless Execution)`;
-                    
-                    // Ini memicu popup di MetaMask "Sign Message" - TIDAK PERLU ETH UNTUK GAS
+                    const message = `OPEN ${tradeSide.toUpperCase()} ETH/USD\nMargin: $${margin}\nLeverage: ${leverage}x\nPrice: $${marketData.priceUsd.toFixed(2)}`;
                     await signer.signMessage(message);
                     
-                    addToast('Tanda Tangan Sukses! Swap Berhasil.', 'success');
+                    // 2. Execute Trade (Internal Simulation)
+                    setMockUsdcBalance(prev => prev - margin);
                     
-                    // Update simulasi balance
-                    if (inputToken === 'ETH') setMockBalance(prev => Math.max(0, prev - parseFloat(inputAmount)));
-                    else setMockBalance(prev => prev + parseFloat(outputAmount));
-                    
-                    setInputAmount('');
-                    setOutputAmount('');
-                    
-                } catch (error) {
-                    console.error("Tx Error:", error);
-                    addToast('Dibatalkan oleh User', 'error');
-                } finally {
-                    setIsSwapping(false);
+                    const newPosition = {
+                        id: Date.now(),
+                        symbol: 'ETH/USD',
+                        side: tradeSide,
+                        entryPrice: marketData.priceUsd,
+                        margin: margin,
+                        leverage: leverage,
+                        sizeUsd: margin * leverage,
+                        sizeEth: (margin * leverage) / marketData.priceUsd,
+                        liquidationPrice: tradeSide === 'Long' 
+                            ? marketData.priceUsd * (1 - (1/leverage) + 0.005) // Approx liquidation logic
+                            : marketData.priceUsd * (1 + (1/leverage) - 0.005)
+                    };
+
+                    setPositions(prev => [newPosition, ...prev]);
+                    addToast(`Posisi ${tradeSide} Terbuka!`, 'success');
+                    setMarginAmount('');
+
+                } catch (e) {
+                    addToast('Order Dibatalkan', 'error');
                 }
             };
 
-            const fetchMarketData = async () => {
-                try {
-                    const response = await fetch(API_URL);
-                    const data = await response.json();
-                    if (data.pair) {
-                        const pair = data.pair;
-                        const currentPrice = parseFloat(pair.priceUsd);
-                        if (prevPriceRef.current > 0) {
-                            if (currentPrice > prevPriceRef.current) setPriceFlash('flash-green');
-                            else if (currentPrice < prevPriceRef.current) setPriceFlash('flash-red');
-                            setTimeout(() => setPriceFlash(''), 1000);
-                        }
-                        prevPriceRef.current = currentPrice;
-                        setMarketData({
-                            priceUsd: currentPrice, priceChange: pair.priceChange.h24, volume24h: pair.volume.h24,
-                            marketCap: pair.fdv, pairName: `${pair.baseToken.symbol}/${pair.quoteToken.symbol}`, loading: false
-                        });
-                        if (chartData.length === 0) generateChartData(currentPrice, currentTimeFrame);
-                        else lastChartPointRef.current = { time: 'LIVE', price: currentPrice };
-                    }
-                } catch (err) { console.error(err); }
-            };
+            const closePosition = (id) => {
+                const pos = positions.find(p => p.id === id);
+                if (!pos) return;
 
-            const generateChartData = (price, tf) => {
-                let points = 50; let volatility = 0.002; let intervalMinutes = 1;
-                if (tf === '1H') { points = 60; volatility = 0.0005; intervalMinutes = 1; }
-                else if (tf === '4H') { points = 48; volatility = 0.002; intervalMinutes = 5; }
-                else if (tf === '1D') { points = 24; volatility = 0.01; intervalMinutes = 60; }
-                let data = []; let currentP = price;
-                for (let i = points; i > 0; i--) {
-                    const change = (Math.random() - 0.5) * (price * volatility);
-                    currentP = currentP - change;
-                    const time = new Date(Date.now() - i * intervalMinutes * 60000);
-                    data.push({ time: time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), price: currentP });
+                const currentPrice = marketData.priceUsd;
+                let pnl = 0;
+                if (pos.side === 'Long') {
+                    pnl = (currentPrice - pos.entryPrice) * pos.sizeEth;
+                } else {
+                    pnl = (pos.entryPrice - currentPrice) * pos.sizeEth;
                 }
-                data.push({ time: 'LIVE', price: price });
-                setChartData(data);
-                lastChartPointRef.current = { time: 'LIVE', price: price };
+
+                setMockUsdcBalance(prev => prev + pos.margin + pnl); // Return margin + PnL
+                setPositions(prev => prev.filter(p => p.id !== id));
+                addToast(`Posisi Ditutup. PnL: $${pnl.toFixed(2)}`, pnl >= 0 ? 'success' : 'error');
             };
 
+            // --- DATA FEED & PNL UPDATE ---
             useEffect(() => {
-                fetchMarketData();
-                const interval = setInterval(fetchMarketData, 10000);
+                const fetchPrice = async () => {
+                    try {
+                        const res = await fetch(API_URL);
+                        const data = await res.json();
+                        if (data.pair) {
+                            const price = parseFloat(data.pair.priceUsd);
+                            setMarketData(prev => ({
+                                ...prev,
+                                priceUsd: price,
+                                priceChange: data.pair.priceChange.h24,
+                                loading: false
+                            }));
+                            
+                            // Update Chart Logic (Simplified)
+                            if (chartData.length === 0) {
+                                // Init dummy chart
+                                let d = [];
+                                for(let i=50; i>0; i--) d.push({time: i, price: price * (1 + (Math.random()-0.5)*0.01)});
+                                setChartData(d);
+                            } else {
+                                lastChartPointRef.current = { time: 'LIVE', price };
+                            }
+                        }
+                    } catch (e) {}
+                };
+                fetchPrice();
+                const interval = setInterval(fetchPrice, 5000); // 5s poll
                 return () => clearInterval(interval);
-            }, [currentTimeFrame]);
+            }, []);
 
+            // Micro-ticker for chart & liquidation check
             useEffect(() => {
                 const tick = setInterval(() => {
-                    if (lastChartPointRef.current && chartData.length > 0) {
-                        setChartData(prevData => {
-                            const newData = [...prevData];
-                            const lastPoint = newData[newData.length - 1];
-                            const noise = (Math.random() - 0.5) * (marketData.priceUsd * 0.0002); 
-                            newData[newData.length - 1] = { ...lastPoint, price: marketData.priceUsd + noise };
+                    if (marketData.priceUsd > 0) {
+                        // Simulate micro price moves
+                        const noise = (Math.random() - 0.5) * (marketData.priceUsd * 0.0005);
+                        const currentSimPrice = marketData.priceUsd + noise;
+
+                        // Update Chart
+                        setChartData(prev => {
+                            const newData = [...prev];
+                            if(newData.length > 0) newData[newData.length - 1] = { time: 'LIVE', price: currentSimPrice };
                             return newData;
+                        });
+
+                        // Check Liquidations
+                        setPositions(prevPositions => {
+                            return prevPositions.filter(pos => {
+                                const isLiq = pos.side === 'Long' 
+                                    ? currentSimPrice <= pos.liquidationPrice 
+                                    : currentSimPrice >= pos.liquidationPrice;
+                                
+                                if (isLiq) {
+                                    addToast(`⚠️ Posisi Likuidasi! Lost $${pos.margin.toFixed(2)}`, 'error');
+                                    return false; // Remove position
+                                }
+                                return true;
+                            });
                         });
                     }
                 }, 1000);
                 return () => clearInterval(tick);
             }, [marketData.priceUsd]);
 
-            useEffect(() => {
-                if (!inputAmount || !marketData.priceUsd) { setOutputAmount(''); return; }
-                const val = parseFloat(inputAmount);
-                if (isNaN(val)) return;
-                const price = marketData.priceUsd;
-                setOutputAmount(inputToken === 'ETH' ? (val * price).toFixed(2) : (val / price).toFixed(6));
-            }, [inputAmount, inputToken, marketData.priceUsd]);
-
-            const switchTokens = () => { setInputToken(outputToken); setOutputToken(inputToken); setInputAmount(outputAmount); };
+            // --- FAUCET ---
+            const handleFaucet = () => {
+                setIsFaucetLoading(true);
+                setTimeout(() => {
+                    setMockUsdcBalance(prev => prev + 1000);
+                    setIsFaucetLoading(false);
+                    addToast('+$1,000 Mock USDC Added', 'success');
+                }, 1000);
+            };
 
             return (
-                <div className="min-h-screen pb-6 flex flex-col font-sans relative bg-[#0b0e14]">
+                <div className="min-h-screen pb-6 flex flex-col font-sans bg-[#0b0e14] text-gray-200">
                     
                     {/* BANNER */}
-                    <div className="bg-[#0052ff]/10 border-b border-[#0052ff]/30 text-[#0052ff] text-xs font-bold text-center py-1.5 flex justify-center items-center gap-2">
-                        <IconActivity />
-                        <span>BASE ZERO FEE MODE: Powered by MetaMask.</span>
+                    <div className="bg-[#0052ff]/10 border-b border-[#0052ff]/30 text-[#0052ff] text-xs font-bold text-center py-1.5">
+                        FUTURES SIMULATION: Zero Gas Fee • Base Network • 100x Leverage
                     </div>
 
                     {/* TOASTS */}
                     <div className="fixed top-20 right-4 z-[150] flex flex-col gap-2">
-                        {toasts.map(toast => (
-                            <div key={toast.id} className={`toast-enter bg-[#1a202e] border-l-4 ${toast.type === 'success' ? 'border-green-500' : 'border-red-500'} p-3 rounded shadow-lg flex items-center gap-3 min-w-[200px]`}>
-                                {toast.type === 'success' ? <div className="w-2 h-2 bg-green-500 rounded-full"></div> : <div className="w-2 h-2 bg-red-500 rounded-full"></div>}
-                                <span className="text-sm font-medium">{toast.msg}</span>
-                            </div>
+                        {toasts.map(t => (
+                            <div key={t.id} className={`toast-enter bg-[#1a202e] border-l-4 ${t.type === 'success' ? 'border-green-500' : t.type === 'error' ? 'border-red-500' : 'border-blue-500'} p-3 rounded shadow-lg text-sm font-medium`}>{t.msg}</div>
                         ))}
                     </div>
 
                     {/* NAVBAR */}
                     <nav className="border-b border-gray-800 bg-[#0b0e14]/95 backdrop-blur sticky top-0 z-50 px-4 h-16 flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <button className="md:hidden text-gray-400" onClick={()=>setIsMobileMenuOpen(!isMobileMenuOpen)}><IconMenu /></button>
+                            <IconMenu className="md:hidden" />
                             <div className="flex items-center gap-2 text-[#0052ff]">
                                 <IconActivity />
-                                <span className="text-xl font-bold tracking-tight text-white">DexPro <span className="text-xs font-normal text-white bg-[#E17726] px-1.5 py-0.5 rounded ml-1">METAMASK</span></span>
+                                <span className="text-xl font-bold tracking-tight text-white">DexPro <span className="text-xs text-white bg-[#0052ff] px-1.5 py-0.5 rounded ml-1">FUTURES</span></span>
                             </div>
                         </div>
-
-                        <div className="flex items-center gap-3">
-                            {account && (
-                                <div className="hidden sm:flex flex-col items-end text-xs mr-2">
-                                    <span className="text-gray-400 flex items-center gap-1">
-                                        {totalDisplayBalance} ETH
-                                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                                    </span>
-                                    <span className="font-bold text-gray-500">{networkName || 'Detecting...'}</span>
-                                </div>
-                            )}
-                            <button onClick={account ? () => {} : connectMetaMask} className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all ${account ? 'bg-[#1a202e] text-[#0052ff] border border-[#0052ff]/30' : 'bg-[#E17726] hover:bg-[#c96218] text-white'}`}>
-                                {!account && <IconMetaMask />}
-                                {account ? `${account.slice(0,6)}...${account.slice(-4)}` : 'Connect MetaMask'}
-                            </button>
-                        </div>
+                        <button onClick={connectMetaMask} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all ${account ? 'bg-[#1a202e] text-[#0052ff] border border-[#0052ff]/30' : 'bg-[#E17726] hover:bg-[#c96218] text-white'}`}>
+                            {account ? `${account.slice(0,6)}...${account.slice(-4)}` : <><IconMetaMask /> Connect Wallet</>}
+                        </button>
                     </nav>
 
                     {/* MAIN CONTENT */}
-                    <main className="flex-1 w-full max-w-[1600px] mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 relative z-10">
-                        {/* CHART */}
+                    <main className="flex-1 w-full max-w-[1800px] mx-auto p-2 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+                        
+                        {/* LEFT: CHART (8 cols) */}
                         <div className="lg:col-span-8 flex flex-col gap-4">
-                            <div className="bg-[#131a2a] p-4 rounded-xl border border-gray-800/60 flex flex-col sm:flex-row justify-between sm:items-end gap-4 shadow-lg">
-                                <div className="flex items-center gap-3 sm:gap-4 z-10">
-                                    <div className="relative shrink-0"><div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center border-2 border-[#131a2a] z-10 relative">🔷</div><div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center border-2 border-[#131a2a] absolute top-0 left-5">💵</div></div>
-                                    <div className="pl-6 sm:pl-8">
-                                        <h1 className="text-lg font-bold flex items-center gap-2 text-gray-200">{marketData.pairName} <a href="#" className="text-gray-500 hover:text-blue-400"><IconExternalLink /></a></h1>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className={`text-2xl font-mono font-bold tracking-tight transition-colors duration-300 ${priceFlash}`}>${marketData.priceUsd.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            {!marketData.loading && <span className={`px-2 py-0.5 rounded text-xs font-bold bg-opacity-20 ${marketData.priceChange >= 0 ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>{marketData.priceChange >= 0 ? '+' : ''}{marketData.priceChange}%</span>}
-                                        </div>
-                                    </div>
+                            {/* Header Info */}
+                            <div className="bg-[#131a2a] p-4 rounded-xl border border-gray-800 flex justify-between items-center">
+                                <div>
+                                    <h1 className="text-xl font-bold flex items-center gap-2 text-white">ETH / USD <span className="text-xs bg-gray-700 px-2 py-0.5 rounded text-gray-300">Perpetual</span></h1>
+                                    <div className="text-2xl font-mono font-bold text-white mt-1">${marketData.priceUsd.toLocaleString(undefined, {minimumFractionDigits:2})}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-xs text-gray-400">24h Change</div>
+                                    <div className={`font-bold ${marketData.priceChange>=0?'text-pnl-green':'text-pnl-red'}`}>{marketData.priceChange}%</div>
                                 </div>
                             </div>
-                            <div className="bg-[#131a2a] border border-gray-800 rounded-xl p-1 h-[450px] relative overflow-hidden flex flex-col justify-center items-center shadow-lg">
-                                {chartData.length > 0 ? (
-                                    <div className="flex-1 w-full mt-4">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <AreaChart data={chartData}>
-                                                <defs><linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#0052ff" stopOpacity={0.3}/><stop offset="95%" stopColor="#0052ff" stopOpacity={0}/></linearGradient></defs>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
-                                                <XAxis dataKey="time" hide />
-                                                <YAxis domain={['auto', 'auto']} orientation="right" tick={{fill: '#9ca3af', fontSize: 11}} axisLine={false} tickLine={false} width={60} tickFormatter={(val) => `$${val.toFixed(0)}`} />
-                                                <Tooltip contentStyle={{ backgroundColor: 'rgba(17, 24, 39, 0.9)', border: '1px solid #374151' }} itemStyle={{ color: '#fff' }} formatter={(val) => [`$${val.toFixed(2)}`, 'Price']} />
-                                                <Area type="monotone" dataKey="price" stroke="#0052ff" strokeWidth={2} fill="url(#colorPrice)" isAnimationActive={false} />
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                ) : <div className="w-12 h-12 border-4 border-[#0052ff] border-t-transparent rounded-full animate-spin"></div>}
+
+                            {/* Chart Area */}
+                            <div className="bg-[#131a2a] border border-gray-800 rounded-xl h-[400px] relative">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={chartData}>
+                                        <defs><linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#0052ff" stopOpacity={0.3}/><stop offset="95%" stopColor="#0052ff" stopOpacity={0}/></linearGradient></defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+                                        <XAxis dataKey="time" hide />
+                                        <YAxis domain={['auto', 'auto']} orientation="right" tick={{fill: '#9ca3af', fontSize: 11}} axisLine={false} tickLine={false} width={60} tickFormatter={(val) => `$${val.toFixed(0)}`} />
+                                        <Area type="monotone" dataKey="price" stroke="#0052ff" strokeWidth={2} fill="url(#colorPrice)" isAnimationActive={false} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+
+                            {/* POSITIONS TABLE */}
+                            <div className="bg-[#131a2a] border border-gray-800 rounded-xl p-4 overflow-x-auto min-h-[200px]">
+                                <h3 className="font-bold text-white mb-4">Open Positions ({positions.length})</h3>
+                                <table className="w-full text-left text-sm">
+                                    <thead className="text-gray-500 border-b border-gray-700">
+                                        <tr>
+                                            <th className="pb-2">Symbol</th>
+                                            <th className="pb-2">Size</th>
+                                            <th className="pb-2">Entry Price</th>
+                                            <th className="pb-2">Mark Price</th>
+                                            <th className="pb-2">Liq. Price</th>
+                                            <th className="pb-2">PnL (ROE%)</th>
+                                            <th className="pb-2 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-gray-300">
+                                        {positions.length === 0 ? (
+                                            <tr><td colSpan="7" className="text-center py-8 text-gray-600">No active positions</td></tr>
+                                        ) : (
+                                            positions.map(pos => {
+                                                const currentPrice = marketData.priceUsd;
+                                                const pnl = pos.side === 'Long' 
+                                                    ? (currentPrice - pos.entryPrice) * pos.sizeEth
+                                                    : (pos.entryPrice - currentPrice) * pos.sizeEth;
+                                                const roe = (pnl / pos.margin) * 100;
+                                                
+                                                return (
+                                                    <tr key={pos.id} className="border-b border-gray-800/50">
+                                                        <td className="py-3 font-bold flex items-center gap-1">
+                                                            <span className={pos.side==='Long'?'text-pnl-green':'text-pnl-red'}>{pos.side}</span> 
+                                                            <span className="text-xs bg-gray-800 px-1 rounded">{pos.leverage}x</span>
+                                                        </td>
+                                                        <td className="py-3">${pos.sizeUsd.toFixed(0)}</td>
+                                                        <td className="py-3">${pos.entryPrice.toFixed(2)}</td>
+                                                        <td className="py-3">${currentPrice.toFixed(2)}</td>
+                                                        <td className="py-3 text-orange-400">${pos.liquidationPrice.toFixed(2)}</td>
+                                                        <td className={`py-3 font-mono ${pnl >= 0 ? 'text-pnl-green' : 'text-pnl-red'}`}>
+                                                            ${pnl.toFixed(2)} ({roe.toFixed(2)}%)
+                                                        </td>
+                                                        <td className="py-3 text-right">
+                                                            <button onClick={() => closePosition(pos.id)} className="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-xs">Close</button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
 
-                        {/* SWAP UI */}
-                        <div className="lg:col-span-4">
-                            <div className="bg-[#131a2a] border border-gray-800 rounded-2xl p-5 shadow-2xl lg:sticky lg:top-24">
-                                <div className="flex justify-between items-center mb-5"><span className="font-bold text-white text-lg">Swap (Base)</span><div className="flex gap-3 text-gray-400"><IconRefresh /><IconSettings /></div></div>
+                        {/* RIGHT: ORDER FORM (4 cols) */}
+                        <div className="lg:col-span-4 flex flex-col gap-4">
+                            <div className="bg-[#131a2a] border border-gray-800 rounded-xl p-5 shadow-xl h-fit sticky top-20">
+                                {/* Mode Switch */}
+                                <div className="flex bg-[#0b0e14] p-1 rounded-lg mb-6">
+                                    <button onClick={() => setTradeSide('Long')} className={`flex-1 py-2 rounded-md font-bold text-sm transition-all ${tradeSide==='Long' ? 'bg-[#2ebd85] text-white' : 'text-gray-500 hover:text-gray-300'}`}>Long</button>
+                                    <button onClick={() => setTradeSide('Short')} className={`flex-1 py-2 rounded-md font-bold text-sm transition-all ${tradeSide==='Short' ? 'bg-[#f6465d] text-white' : 'text-gray-500 hover:text-gray-300'}`}>Short</button>
+                                </div>
 
-                                {account && (
+                                {/* Order Inputs */}
+                                <div className="space-y-6">
+                                    {/* Order Type */}
+                                    <div className="flex justify-between text-xs text-gray-400 font-bold px-1">
+                                        <span className="text-white border-b-2 border-[#0052ff] pb-1 cursor-pointer">Market</span>
+                                        <span className="cursor-pointer hover:text-white">Limit</span>
+                                        <span className="cursor-pointer hover:text-white">Stop</span>
+                                    </div>
+
+                                    {/* Balance */}
+                                    <div className="flex justify-between text-xs text-gray-400">
+                                        <span>Available</span>
+                                        <span className="text-white font-mono">${mockUsdcBalance.toFixed(2)} USDC</span>
+                                    </div>
+
+                                    {/* Margin Input */}
+                                    <div className="bg-[#0b0e14] rounded-lg p-3 border border-gray-700 focus-within:border-[#0052ff]">
+                                        <div className="flex justify-between text-xs text-gray-500 mb-1"><span>Margin (Collateral)</span></div>
+                                        <div className="flex justify-between items-center">
+                                            <input 
+                                                type="number" 
+                                                value={marginAmount}
+                                                onChange={(e) => setMarginAmount(e.target.value)}
+                                                placeholder="0.00" 
+                                                className="bg-transparent text-xl font-bold w-full outline-none text-white"
+                                            />
+                                            <span className="text-sm font-bold text-gray-400">USDC</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Leverage Slider */}
+                                    <div>
+                                        <div className="flex justify-between text-xs mb-2">
+                                            <span className="text-gray-400">Leverage</span>
+                                            <span className="font-bold text-white">{leverage}x</span>
+                                        </div>
+                                        <input 
+                                            type="range" 
+                                            min="1" max="100" 
+                                            value={leverage} 
+                                            onChange={(e) => setLeverage(e.target.value)} 
+                                        />
+                                        <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+                                            <span>1x</span><span>25x</span><span>50x</span><span>75x</span><span>100x</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Info Summary */}
+                                    <div className="space-y-2 bg-[#0b0e14]/50 p-3 rounded-lg text-xs">
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Position Size</span>
+                                            <span className="text-white font-mono">${calculatePositionSize().toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Entry Price</span>
+                                            <span className="text-white font-mono">${marketData.priceUsd.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Est. Liq Price</span>
+                                            <span className="text-orange-400 font-mono">
+                                                ${(tradeSide==='Long' 
+                                                    ? marketData.priceUsd * (1 - (1/leverage) + 0.005)
+                                                    : marketData.priceUsd * (1 + (1/leverage) - 0.005)
+                                                ).toFixed(2)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Fee (Gasless)</span>
+                                            <span className="text-green-400">0.00 USDC</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Action Button */}
+                                    {account ? (
+                                        <button 
+                                            onClick={handleOpenPosition}
+                                            className={`w-full py-3.5 rounded-lg font-bold text-lg transition-all shadow-lg ${
+                                                tradeSide === 'Long' 
+                                                ? 'bg-[#2ebd85] hover:bg-[#25a875] text-white' 
+                                                : 'bg-[#f6465d] hover:bg-[#d93b50] text-white'
+                                            }`}
+                                        >
+                                            {tradeSide === 'Long' ? 'Buy / Long' : 'Sell / Short'}
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            onClick={connectMetaMask}
+                                            className="w-full py-3.5 rounded-lg font-bold text-lg bg-[#E17726] hover:bg-[#c96218] text-white shadow-lg flex items-center justify-center gap-2"
+                                        >
+                                            <IconMetaMask /> Connect to Trade
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Faucet Box */}
+                            {account && (
+                                <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-500/20 rounded-xl p-4 text-center">
+                                    <div className="text-xs text-blue-300 mb-2">Butuh modal untuk test Futures?</div>
                                     <button 
                                         onClick={handleFaucet}
                                         disabled={isFaucetLoading}
-                                        className="w-full mb-4 py-2 rounded-lg bg-green-500/20 text-green-400 border border-green-500/30 font-semibold text-sm hover:bg-green-500/30 transition-all flex items-center justify-center gap-2"
+                                        className="w-full py-2 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/50 text-blue-400 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all"
                                     >
-                                        {isFaucetLoading ? <span className="animate-spin">⏳</span> : <IconGift />}
-                                        {isFaucetLoading ? 'Menambang ETH...' : 'Klaim 1 ETH (Mock Reward)'}
+                                        {isFaucetLoading ? 'Loading...' : <><IconGift /> Klaim $1,000 Mock USDC</>}
                                     </button>
-                                )}
-
-                                <div className="bg-[#0b0e14] rounded-xl p-4 border border-gray-800">
-                                    <div className="flex justify-between text-xs font-medium text-gray-400 mb-2"><span>Jual</span><span>Balance: {account ? totalDisplayBalance : '0'}</span></div>
-                                    <div className="flex justify-between items-center gap-3">
-                                        <input type="number" placeholder="0.0" value={inputAmount} onChange={(e) => setInputAmount(e.target.value)} className="bg-transparent text-3xl font-bold text-white outline-none w-full placeholder-gray-700" />
-                                        <div className="flex items-center gap-2 bg-[#1f2937] px-3 py-1.5 rounded-full shrink-0 border border-gray-700 font-bold text-sm">{inputToken} <IconChevronDown /></div>
-                                    </div>
                                 </div>
-
-                                <div className="relative h-4 z-10 my-[-10px]"><button onClick={switchTokens} className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#131a2a] border-4 border-[#131a2a] p-2 rounded-xl text-gray-400 hover:text-[#0052ff] border-gray-800 shadow-lg"><IconArrowDownUp /></button></div>
-
-                                <div className="bg-[#0b0e14] rounded-xl p-4 border border-gray-800 mt-2 mb-6">
-                                    <div className="flex justify-between text-xs font-medium text-gray-400 mb-2"><span>Terima</span><span>Est. Output</span></div>
-                                    <div className="flex justify-between items-center gap-3">
-                                        <input type="text" placeholder="0.0" value={outputAmount} readOnly className="bg-transparent text-3xl font-bold text-white outline-none w-full cursor-default" />
-                                        <div className="flex items-center gap-2 bg-[#1f2937] px-3 py-1.5 rounded-full shrink-0 border border-gray-700 font-bold text-sm">{outputToken} <IconChevronDown /></div>
-                                    </div>
-                                    <div className="text-xs font-medium text-gray-500 mt-2 flex justify-between">
-                                        <span className="flex items-center gap-1 text-green-400"><IconBolt /> Fee: Rp 0 (Base Zero)</span>
-                                        <span className="text-[#0052ff]/80">Base Sepolia</span>
-                                    </div>
-                                </div>
-
-                                {account ? (
-                                    <button 
-                                        onClick={handleSwap}
-                                        disabled={isSwapping || !inputAmount}
-                                        className={`w-full py-4 rounded-xl font-bold text-lg transition-all shadow-xl active:scale-[0.98] ${
-                                            isSwapping 
-                                            ? 'bg-gray-700 text-gray-300 cursor-wait' 
-                                            : !inputAmount 
-                                                ? 'bg-[#1f2937] text-gray-500 cursor-not-allowed'
-                                                : 'bg-[#0052ff] hover:bg-[#0042cc] text-white'
-                                        }`}
-                                    >
-                                        {isSwapping ? 'Sign in MetaMask...' : !inputAmount ? 'Masukkan Jumlah' : 'Swap (Zero Fee)'}
-                                    </button>
-                                ) : (
-                                    <button 
-                                        onClick={connectMetaMask}
-                                        className="w-full py-4 rounded-xl font-bold text-lg bg-[#E17726] hover:bg-[#c96218] text-white shadow-xl transition-all flex items-center justify-center gap-2"
-                                    >
-                                        <IconMetaMask /> Connect MetaMask
-                                    </button>
-                                )}
-                                
-                                <p className="text-[10px] text-gray-500 text-center mt-3">
-                                    *Menggunakan protokol Gasless: Transaksi diproses melalui tanda tangan Off-chain (Gratis).
-                                </p>
-                            </div>
+                            )}
                         </div>
+
                     </main>
                 </div>
             );
