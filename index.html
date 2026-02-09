@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DexPro - Live Realtime Exchange</title>
+    <title>DexPro - Testnet Simulation</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -18,7 +18,7 @@
         
         /* Animasi Loading Awal */
         #root:empty::before {
-            content: 'Memuat Market Data...';
+            content: 'Memuat Testnet Environment...';
             display: flex;
             height: 100vh;
             justify-content: center;
@@ -44,6 +44,19 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Modal Backdrop Blur */
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+        
+        /* Toast Animation */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .toast-enter { animation: slideIn 0.3s ease-out forwards; }
     </style>
 
     <!-- IMPORT MAP -->
@@ -74,14 +87,16 @@
         const IconChevronDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
         const IconExternalLink = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>;
         const IconRefresh = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>;
-        const IconWallet = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h16v4"/><path d="M3 15v4a2 2 0 0 0 2 2h16v-4"/><path d="M14.5 18.5 21 12"/></svg>;
+        const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>;
+        const IconCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+        const IconAlert = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
 
         // --- CONFIG ---
         const PAIR_ADDRESS = '0x2287a9620adcbf6250dc71be9ee9b2d3a1ec85a464fc6f5c06669e8d07b61bba';
         const API_URL = `https://api.dexscreener.com/latest/dex/pairs/ethereum/${PAIR_ADDRESS}`;
 
         function App() {
-            // State
+            // State Utama
             const [walletConnected, setWalletConnected] = useState(false);
             const [walletAddress, setWalletAddress] = useState('');
             const [marketData, setMarketData] = useState({
@@ -94,36 +109,63 @@
             const [outputToken, setOutputToken] = useState('USDC');
             const [inputAmount, setInputAmount] = useState('');
             const [outputAmount, setOutputAmount] = useState('');
-            const [isSwapping, setIsSwapping] = useState(false);
             const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-            const [priceFlash, setPriceFlash] = useState(''); // 'green' or 'red'
+            const [priceFlash, setPriceFlash] = useState('');
+
+            // State Simulasi Wallet & Transaksi
+            const [showWalletModal, setShowWalletModal] = useState(false);
+            const [showTxModal, setShowTxModal] = useState(false);
+            const [txStep, setTxStep] = useState('idle'); // idle, approving, approved, confirming, processing, success
+            const [txHash, setTxHash] = useState('');
+            const [toasts, setToasts] = useState([]); // Array of toasts
+            const [isApproved, setIsApproved] = useState(false); // Simulasi status approve
 
             const prevPriceRef = useRef(0);
-            const lastChartPointRef = useRef(null); // Untuk live chart update
+            const lastChartPointRef = useRef(null);
 
-            // --- 1. PERSISTENT WALLET CONNECTION ---
+            // --- 1. INITIALIZATION ---
             useEffect(() => {
                 const savedWallet = localStorage.getItem('dex_wallet_connected');
                 if (savedWallet === 'true') {
                     setWalletConnected(true);
                     setWalletAddress('0x71C...9A21');
                 }
+                addToast('Welcome to Testnet Mode', 'info');
             }, []);
 
-            const toggleConnect = () => {
-                if (walletConnected) {
-                    setWalletConnected(false);
-                    setWalletAddress('');
-                    localStorage.removeItem('dex_wallet_connected');
-                } else {
-                    // Simulate instant connect
+            // --- 2. TOAST SYSTEM ---
+            const addToast = (msg, type = 'success') => {
+                const id = Date.now();
+                setToasts(prev => [...prev, { id, msg, type }]);
+                setTimeout(() => {
+                    setToasts(prev => prev.filter(t => t.id !== id));
+                }, 4000);
+            };
+
+            // --- 3. WALLET CONNECTION FLOW ---
+            const openConnectModal = () => setShowWalletModal(true);
+            
+            const connectWallet = (provider) => {
+                setShowWalletModal(false);
+                addToast(`Menghubungkan ke ${provider}...`, 'info');
+                
+                setTimeout(() => {
                     setWalletConnected(true);
                     setWalletAddress('0x71C...9A21');
                     localStorage.setItem('dex_wallet_connected', 'true');
-                }
+                    addToast('Dompet Terhubung!', 'success');
+                }, 1500);
             };
 
-            // --- 2. DATA FETCHING & REALTIME LOGIC ---
+            const disconnectWallet = () => {
+                setWalletConnected(false);
+                setWalletAddress('');
+                localStorage.removeItem('dex_wallet_connected');
+                setIsApproved(false);
+                addToast('Dompet Terputus', 'info');
+            };
+
+            // --- 4. DATA FETCHING ---
             const fetchMarketData = async () => {
                 try {
                     const response = await fetch(API_URL);
@@ -133,7 +175,6 @@
                         const pair = data.pair;
                         const currentPrice = parseFloat(pair.priceUsd);
                         
-                        // Flash Effect Logic
                         if (prevPriceRef.current > 0) {
                             if (currentPrice > prevPriceRef.current) setPriceFlash('flash-green');
                             else if (currentPrice < prevPriceRef.current) setPriceFlash('flash-red');
@@ -150,99 +191,61 @@
                             loading: false
                         });
 
-                        // Jika chart kosong atau timeframe berubah, generate baru.
-                        // Jika sudah ada, kita hanya "re-anchor" titik terakhir.
                         if (chartData.length === 0) {
                             generateChartData(currentPrice, currentTimeFrame);
                         } else {
-                            // Update referensi terakhir untuk animasi smooth
                             lastChartPointRef.current = { time: 'LIVE', price: currentPrice };
                         }
                     }
-                } catch (err) { 
-                    console.error("API Error:", err); 
-                }
+                } catch (err) { console.error("API Error:", err); }
             };
 
-            // --- 3. TIMEFRAME & CHART GENERATION LOGIC ---
             const generateChartData = (price, tf) => {
                 let points = 50;
-                let volatility = 0.002; // default 0.2%
+                let volatility = 0.002;
                 let intervalMinutes = 1;
 
-                // Atur parameter berdasarkan timeframe
-                if (tf === '1H') {
-                    points = 60; // 60 menit
-                    volatility = 0.0005; // Volatilitas rendah (per menit)
-                    intervalMinutes = 1;
-                } else if (tf === '4H') {
-                    points = 48; // 4 jam (per 5 menit)
-                    volatility = 0.002;
-                    intervalMinutes = 5;
-                } else if (tf === '1D') {
-                    points = 24; // 24 jam (per jam)
-                    volatility = 0.01; // Volatilitas tinggi (per jam)
-                    intervalMinutes = 60;
-                }
+                if (tf === '1H') { points = 60; volatility = 0.0005; intervalMinutes = 1; }
+                else if (tf === '4H') { points = 48; volatility = 0.002; intervalMinutes = 5; }
+                else if (tf === '1D') { points = 24; volatility = 0.01; intervalMinutes = 60; }
 
                 let data = [];
                 let currentP = price;
                 
-                // Generate histori mundur
                 for (let i = points; i > 0; i--) {
-                    // Random walk algorithm
                     const change = (Math.random() - 0.5) * (price * volatility);
                     currentP = currentP - change;
-                    
                     const time = new Date(Date.now() - i * intervalMinutes * 60000);
                     const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    
-                    data.push({ 
-                        originalTime: time, // Simpan objek date asli untuk sorting jika perlu
-                        time: timeStr, 
-                        price: currentP 
-                    });
+                    data.push({ time: timeStr, price: currentP });
                 }
-
-                // Push titik live sekarang
                 data.push({ time: 'LIVE', price: price });
                 setChartData(data);
                 lastChartPointRef.current = { time: 'LIVE', price: price };
             };
 
-            // Initial Load & API Polling (Lebih cepat: 10 detik)
             useEffect(() => {
                 fetchMarketData();
-                const interval = setInterval(fetchMarketData, 10000); // Poll setiap 10 detik
+                const interval = setInterval(fetchMarketData, 10000);
                 return () => clearInterval(interval);
-            }, [currentTimeFrame]); // Re-fetch/Re-gen saat timeframe ganti
+            }, [currentTimeFrame]);
 
-            // --- 4. MICRO-ANIMATION TICKER (Setiap 1 Detik) ---
-            // Ini membuat chart terasa "Live" bergerak terus walaupun API dex screener belum update
             useEffect(() => {
                 const tick = setInterval(() => {
                     if (lastChartPointRef.current && chartData.length > 0) {
                         setChartData(prevData => {
                             const newData = [...prevData];
                             const lastPoint = newData[newData.length - 1];
-                            
-                            // Gerakan mikro acak kecil (noise) di sekitar harga asli terakhir
-                            // Agar grafik terlihat 'bernapas'
                             const noise = (Math.random() - 0.5) * (marketData.priceUsd * 0.0002); 
-                            const simulatedPrice = marketData.priceUsd + noise;
-
-                            newData[newData.length - 1] = {
-                                ...lastPoint,
-                                price: simulatedPrice
-                            };
+                            newData[newData.length - 1] = { ...lastPoint, price: marketData.priceUsd + noise };
                             return newData;
                         });
                     }
-                }, 1000); // Update grafik tiap 1 detik
+                }, 1000);
                 return () => clearInterval(tick);
-            }, [marketData.priceUsd]); // Dependency ke harga asli
+            }, [marketData.priceUsd]);
 
-            // Swap Calculator Logic
+            // Calculator
             useEffect(() => {
                 if (!inputAmount || !marketData.priceUsd) { setOutputAmount(''); return; }
                 const val = parseFloat(inputAmount);
@@ -254,71 +257,260 @@
             // Handlers
             const handleTimeFrameChange = (tf) => {
                 setCurrentTimeFrame(tf);
-                setChartData([]); // Clear chart agar loading spinner muncul sebentar/regenerate
+                setChartData([]); 
                 setMarketData(prev => ({...prev, loading: true})); 
-                // fetchMarketData akan dipanggil oleh useEffect karena dependency [currentTimeFrame]
             };
 
             const switchTokens = () => {
                 setInputToken(outputToken);
                 setOutputToken(inputToken);
                 setInputAmount(outputAmount);
+                setIsApproved(false); // Reset approve saat switch
             };
 
             const formatNum = (n) => {
                 if (!n) return '0';
                 if (n >= 1e9) return (n/1e9).toFixed(2)+'B'; 
                 if (n >= 1e6) return (n/1e6).toFixed(2)+'M';
-                if (n >= 1e3) return (n/1e3).toFixed(2)+'K';
                 return n.toFixed(2);
             };
 
+            // --- 5. TRANSACTION SIMULATION FLOW ---
+            const initiateSwap = () => {
+                if (!walletConnected) {
+                    openConnectModal();
+                    return;
+                }
+                if (!inputAmount) return;
+                
+                // Jika token bukan ETH (misal token lain), butuh approval dulu
+                // Untuk simulasi ini, kita anggap token selain ETH perlu approve
+                if (inputToken !== 'ETH' && !isApproved) {
+                    setTxStep('approving');
+                } else {
+                    setTxStep('confirming');
+                }
+                setShowTxModal(true);
+            };
+
+            const handleApprove = () => {
+                setTxStep('processing_approve');
+                setTimeout(() => {
+                    setIsApproved(true);
+                    setTxStep('confirming'); // Lanjut ke konfirmasi swap
+                    addToast(`Berhasil Approve ${inputToken}`, 'success');
+                }, 2000);
+            };
+
+            const confirmTransaction = () => {
+                setTxStep('processing');
+                // Simulasi delay blockchain random (2-5 detik)
+                const delay = Math.floor(Math.random() * 3000) + 2000;
+                
+                setTimeout(() => {
+                    setTxStep('success');
+                    setTxHash('0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(''));
+                    addToast('Swap Berhasil!', 'success');
+                }, delay);
+            };
+
+            const closeTxModal = () => {
+                setShowTxModal(false);
+                setTxStep('idle');
+                if (txStep === 'success') {
+                    setInputAmount('');
+                    setOutputAmount('');
+                }
+            };
+
             return (
-                <div className="min-h-screen pb-6 flex flex-col font-sans">
+                <div className="min-h-screen pb-6 flex flex-col font-sans relative bg-[#0b0e14]">
                     
+                    {/* TESTNET BANNER */}
+                    <div className="bg-yellow-600/20 border-b border-yellow-600/30 text-yellow-500 text-xs font-bold text-center py-1.5 flex justify-center items-center gap-2">
+                        <IconAlert />
+                        <span>TESTNET MODE: Transaksi ini adalah simulasi. Jangan kirim aset asli.</span>
+                    </div>
+
+                    {/* TOAST CONTAINER */}
+                    <div className="fixed top-20 right-4 z-[110] flex flex-col gap-2">
+                        {toasts.map(toast => (
+                            <div key={toast.id} className={`toast-enter bg-[#1a202e] border-l-4 ${toast.type === 'success' ? 'border-green-500' : 'border-blue-500'} p-3 rounded shadow-lg flex items-center gap-3 min-w-[200px]`}>
+                                {toast.type === 'success' ? <div className="w-2 h-2 bg-green-500 rounded-full"></div> : <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
+                                <span className="text-sm font-medium">{toast.msg}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* MODAL PILIH WALLET */}
+                    {showWalletModal && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop" onClick={() => setShowWalletModal(false)}>
+                            <div className="bg-[#1a202e] border border-gray-700 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                                <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+                                    <h3 className="font-bold text-white">Hubungkan Dompet</h3>
+                                    <button onClick={() => setShowWalletModal(false)} className="text-gray-400 hover:text-white"><IconX /></button>
+                                </div>
+                                <div className="p-4 space-y-2">
+                                    {['MetaMask', 'WalletConnect', 'Coinbase Wallet', 'Trust Wallet'].map(wallet => (
+                                        <button key={wallet} onClick={() => connectWallet(wallet)} className="w-full flex items-center justify-between p-3 rounded-xl bg-[#0b0e14] hover:bg-gray-800 border border-gray-800 hover:border-blue-500/50 transition-all group">
+                                            <span className="font-medium text-gray-300 group-hover:text-white">{wallet}</span>
+                                            <div className="w-2 h-2 rounded-full bg-gray-600 group-hover:bg-green-500 transition-colors"></div>
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="p-4 bg-gray-900/50 text-xs text-gray-500 text-center">
+                                    Dengan menghubungkan, Anda menyetujui Ketentuan Layanan Simulasi.
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* MODAL TRANSAKSI */}
+                    {showTxModal && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop">
+                            <div className="bg-[#1a202e] border border-gray-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                                
+                                <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+                                    <h3 className="font-bold text-lg text-white">
+                                        {txStep.includes('approve') ? `Approve ${inputToken}` : 
+                                         txStep === 'confirming' ? 'Konfirmasi Swap' :
+                                         txStep === 'success' ? 'Transaksi Berhasil' : 'Memproses...'}
+                                    </h3>
+                                    <button onClick={closeTxModal} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-gray-800">
+                                        <IconX />
+                                    </button>
+                                </div>
+
+                                <div className="p-6 flex flex-col items-center">
+                                    
+                                    {/* STEP: APPROVE (Khusus Token Non-ETH) */}
+                                    {txStep === 'approving' && (
+                                        <div className="w-full text-center space-y-4">
+                                            <div className="w-16 h-16 mx-auto bg-yellow-500/20 rounded-full flex items-center justify-center text-yellow-500">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-lg">Izinkan penggunaan {inputToken}</h4>
+                                                <p className="text-sm text-gray-400 mt-1">Anda harus memberikan izin kepada protokol untuk menggunakan {inputToken} Anda.</p>
+                                            </div>
+                                            <button onClick={handleApprove} className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white transition-all">
+                                                Approve {inputToken}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {txStep === 'processing_approve' && (
+                                        <div className="py-8 flex flex-col items-center text-center space-y-4">
+                                            <div className="spinner w-12 h-12"></div>
+                                            <p className="text-white font-medium">Menunggu persetujuan di dompet...</p>
+                                        </div>
+                                    )}
+
+                                    {/* STEP: CONFIRM SWAP */}
+                                    {txStep === 'confirming' && (
+                                        <div className="w-full space-y-4">
+                                            <div className="flex justify-between items-center p-3 bg-[#0b0e14] rounded-xl border border-gray-800">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center text-sm font-bold text-blue-500">{inputToken[0]}</div>
+                                                    <span className="text-xl font-bold">{inputAmount}</span>
+                                                </div>
+                                                <span className="text-gray-400 font-medium">{inputToken}</span>
+                                            </div>
+                                            <div className="flex justify-center text-gray-500"><IconArrowDownUp /></div>
+                                            <div className="flex justify-between items-center p-3 bg-[#0b0e14] rounded-xl border border-gray-800">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-green-600/20 flex items-center justify-center text-sm font-bold text-green-500">{outputToken[0]}</div>
+                                                    <span className="text-xl font-bold">{outputAmount}</span>
+                                                </div>
+                                                <span className="text-gray-400 font-medium">{outputToken}</span>
+                                            </div>
+                                            <div className="text-xs text-gray-400 space-y-2 pt-2 border-t border-gray-800">
+                                                <div className="flex justify-between"><span>Rate</span><span>1 {inputToken} = {(marketData.priceUsd).toFixed(2)} {outputToken}</span></div>
+                                                <div className="flex justify-between"><span>Network Fee (Simulasi)</span><span className="text-gray-300">~$4.50</span></div>
+                                            </div>
+                                            <button onClick={confirmTransaction} className="w-full py-3.5 mt-2 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white shadow-lg transition-all">Konfirmasi Swap</button>
+                                        </div>
+                                    )}
+
+                                    {/* STEP: PROCESSING SWAP */}
+                                    {txStep === 'processing' && (
+                                        <div className="py-8 flex flex-col items-center text-center space-y-4">
+                                            <div className="relative">
+                                                <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+                                                <div className="absolute inset-0 flex items-center justify-center"><div className="w-8 h-8 bg-blue-500 rounded-full animate-pulse opacity-20"></div></div>
+                                            </div>
+                                            <div>
+                                                <h4 className="text-xl font-bold text-white mb-1">Memproses Transaksi</h4>
+                                                <p className="text-sm text-gray-400">Mengonfirmasi di Blockchain (Simulasi)...</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* STEP: SUCCESS */}
+                                    {txStep === 'success' && (
+                                        <div className="py-4 flex flex-col items-center text-center space-y-4 w-full">
+                                            <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mb-2 animate-bounce">
+                                                <IconCheck className="text-green-500 w-10 h-10" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-2xl font-bold text-white mb-1">Swap Berhasil!</h4>
+                                                <p className="text-sm text-gray-400">Berhasil menukar {inputAmount} {inputToken} ke {outputToken}</p>
+                                            </div>
+                                            <div className="w-full bg-[#0b0e14] p-3 rounded-lg border border-gray-800 mt-4 text-left">
+                                                <div className="text-xs text-gray-500 mb-1 flex justify-between"><span>Transaction Hash</span><span className="text-green-500">Confirmed</span></div>
+                                                <div className="text-xs text-blue-400 font-mono break-all hover:underline cursor-pointer">{txHash}</div>
+                                            </div>
+                                            <button onClick={closeTxModal} className="w-full py-3 mt-4 bg-gray-800 hover:bg-gray-700 rounded-xl font-bold text-white transition-all">Tutup</button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* NAVBAR */}
                     <nav className="border-b border-gray-800 bg-[#0b0e14]/95 backdrop-blur sticky top-0 z-50 px-4 h-16 flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <button className="md:hidden text-gray-400" onClick={()=>setIsMobileMenuOpen(!isMobileMenuOpen)}>
-                                <IconMenu />
-                            </button>
-                            
+                            <button className="md:hidden text-gray-400" onClick={()=>setIsMobileMenuOpen(!isMobileMenuOpen)}><IconMenu /></button>
                             <div className="flex items-center gap-2 text-blue-500">
                                 <IconActivity />
-                                <span className="text-xl font-bold tracking-tight text-white">DexPro</span>
+                                <span className="text-xl font-bold tracking-tight text-white">DexPro <span className="text-xs font-normal text-yellow-500 bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/30 ml-1">TESTNET</span></span>
                             </div>
-
                             <div className="hidden md:flex gap-1 bg-gray-900/50 p-1 rounded-lg border border-gray-800 ml-4">
                                 {['Swap', 'Limit', 'DCA'].map(item => (
-                                    <button key={item} className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${item === 'Swap' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white'}`}>
-                                        {item}
-                                    </button>
+                                    <button key={item} className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${item === 'Swap' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white'}`}>{item}</button>
                                 ))}
                             </div>
                         </div>
 
-                        <button 
-                            onClick={toggleConnect}
-                            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all ${
-                                walletConnected 
-                                    ? 'bg-[#1a202e] text-green-400 border border-green-900/30'
-                                    : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20'
-                            }`}
-                        >
-                            {walletConnected && <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>}
-                            {walletConnected ? walletAddress : 'Connect Wallet'}
-                        </button>
+                        <div className="flex items-center gap-3">
+                            {walletConnected && (
+                                <div className="hidden sm:flex flex-col items-end text-xs mr-2">
+                                    <span className="text-gray-400">Balance</span>
+                                    <span className="font-bold">1.45 ETH</span>
+                                </div>
+                            )}
+                            <button 
+                                onClick={walletConnected ? disconnectWallet : openConnectModal}
+                                className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all ${
+                                    walletConnected 
+                                        ? 'bg-[#1a202e] text-green-400 border border-green-900/30 hover:bg-red-900/20 hover:text-red-400 hover:border-red-900/50'
+                                        : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20'
+                                }`}
+                            >
+                                {walletConnected && <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>}
+                                {walletConnected ? walletAddress : 'Connect Wallet'}
+                            </button>
+                        </div>
                     </nav>
 
                     {/* MAIN CONTENT */}
                     <main className="flex-1 w-full max-w-[1600px] mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-                        
                         {/* LEFT COLUMN */}
                         <div className="lg:col-span-8 flex flex-col gap-4">
-                            
-                            {/* HEADER INFO */}
-                            <div className="bg-[#131a2a] p-4 rounded-xl border border-gray-800/60 flex flex-col sm:flex-row justify-between sm:items-end gap-4 shadow-lg">
-                                <div className="flex items-center gap-3 sm:gap-4">
+                            {/* Header Info */}
+                            <div className="bg-[#131a2a] p-4 rounded-xl border border-gray-800/60 flex flex-col sm:flex-row justify-between sm:items-end gap-4 shadow-lg relative overflow-hidden">
+                                <div className="flex items-center gap-3 sm:gap-4 z-10">
                                     <div className="relative shrink-0">
                                         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-700 flex items-center justify-center border-2 border-[#131a2a] z-10 relative text-sm sm:text-lg">🔷</div>
                                         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-600 flex items-center justify-center border-2 border-[#131a2a] absolute top-0 left-5 text-sm sm:text-lg">💵</div>
@@ -329,7 +521,6 @@
                                             <a href={`https://dexscreener.com/ethereum/${PAIR_ADDRESS}`} target="_blank" className="text-gray-500 hover:text-blue-400"><IconExternalLink /></a>
                                         </h1>
                                         <div className="flex items-center gap-2 mt-1">
-                                            {/* HARGA LIVE DENGAN ANIMASI FLASH */}
                                             <span className={`text-2xl sm:text-3xl font-mono font-bold tracking-tight transition-colors duration-300 ${priceFlash}`}>
                                                 ${marketData.priceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </span>
@@ -341,9 +532,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                
-                                {/* Stats */}
-                                <div className="flex gap-6 text-xs sm:text-sm w-full sm:w-auto overflow-x-auto hide-scrollbar pb-1 sm:pb-0 border-t sm:border-t-0 border-gray-800 pt-3 sm:pt-0">
+                                <div className="flex gap-6 text-xs sm:text-sm w-full sm:w-auto overflow-x-auto hide-scrollbar pb-1 sm:pb-0 border-t sm:border-t-0 border-gray-800 pt-3 sm:pt-0 z-10">
                                     <div className="flex flex-col whitespace-nowrap">
                                         <span className="text-gray-500 mb-1">Market Cap</span>
                                         <span className="font-semibold tracking-wide text-gray-200">{formatNum(marketData.marketCap)}</span>
@@ -355,81 +544,34 @@
                                 </div>
                             </div>
 
-                            {/* CHART CONTAINER */}
+                            {/* Chart Container */}
                             <div className="bg-[#131a2a] border border-gray-800 rounded-xl p-1 h-[350px] sm:h-[450px] lg:h-[550px] relative overflow-hidden flex flex-col justify-center items-center shadow-lg">
                                 {chartData.length > 0 ? (
                                     <>
                                         <div className="absolute top-3 right-3 z-10 flex gap-1 bg-[#0b0e14]/80 backdrop-blur p-1 rounded-lg border border-gray-800">
                                             {['1H', '4H', '1D'].map((time) => (
-                                                <button 
-                                                    key={time} 
-                                                    onClick={() => handleTimeFrameChange(time)} 
-                                                    className={`px-3 py-1 text-[10px] sm:text-xs font-bold rounded transition-all duration-200 ${
-                                                        currentTimeFrame === time 
-                                                            ? 'bg-blue-600 text-white shadow-lg' 
-                                                            : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                                                    }`}
-                                                >
-                                                    {time}
-                                                </button>
+                                                <button key={time} onClick={() => handleTimeFrameChange(time)} className={`px-3 py-1 text-[10px] sm:text-xs font-bold rounded transition-all duration-200 ${currentTimeFrame === time ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>{time}</button>
                                             ))}
                                         </div>
-                                        
-                                        {/* Status Live */}
                                         <div className="absolute top-3 left-4 z-10 flex items-center gap-2">
-                                            <span className="relative flex h-2.5 w-2.5">
-                                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
-                                            </span>
+                                            <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span></span>
                                             <span className="text-[10px] font-bold text-green-500 tracking-wider">LIVE</span>
                                         </div>
-
                                         <div className="flex-1 w-full mt-4">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <AreaChart data={chartData}>
-                                                    <defs>
-                                                        <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                                                        </linearGradient>
-                                                    </defs>
+                                                    <defs><linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient></defs>
                                                     <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
-                                                    <XAxis 
-                                                        dataKey="time" 
-                                                        hide 
-                                                    />
-                                                    <YAxis 
-                                                        domain={['auto', 'auto']} 
-                                                        orientation="right" 
-                                                        tick={{fill: '#9ca3af', fontSize: 11, fontWeight: 500}} 
-                                                        axisLine={false} 
-                                                        tickLine={false} 
-                                                        width={60}
-                                                        tickFormatter={(val) => `$${val.toFixed(0)}`}
-                                                    />
-                                                    <Tooltip 
-                                                        contentStyle={{ backgroundColor: 'rgba(17, 24, 39, 0.9)', border: '1px solid #374151', borderRadius: '8px', fontSize: '12px' }} 
-                                                        itemStyle={{ color: '#fff' }} 
-                                                        labelStyle={{ color: '#9ca3af', marginBottom: '4px' }}
-                                                        formatter={(val) => [`$${val.toFixed(2)}`, 'Price']} 
-                                                    />
-                                                    <Area 
-                                                        type="monotone" 
-                                                        dataKey="price" 
-                                                        stroke="#3b82f6" 
-                                                        strokeWidth={2} 
-                                                        fill="url(#colorPrice)" 
-                                                        isAnimationActive={false} // Disable default animation for smoother live updates
-                                                    />
+                                                    <XAxis dataKey="time" hide />
+                                                    <YAxis domain={['auto', 'auto']} orientation="right" tick={{fill: '#9ca3af', fontSize: 11, fontWeight: 500}} axisLine={false} tickLine={false} width={60} tickFormatter={(val) => `$${val.toFixed(0)}`} />
+                                                    <Tooltip contentStyle={{ backgroundColor: 'rgba(17, 24, 39, 0.9)', border: '1px solid #374151', borderRadius: '8px', fontSize: '12px' }} itemStyle={{ color: '#fff' }} labelStyle={{ color: '#9ca3af', marginBottom: '4px' }} formatter={(val) => [`$${val.toFixed(2)}`, 'Price']} />
+                                                    <Area type="monotone" dataKey="price" stroke="#3b82f6" strokeWidth={2} fill="url(#colorPrice)" isAnimationActive={false} />
                                                 </AreaChart>
                                             </ResponsiveContainer>
                                         </div>
                                     </>
                                 ) : (
-                                    <div className="flex flex-col items-center gap-3">
-                                        <div className="spinner"></div>
-                                        <span className="text-gray-400 text-sm font-medium animate-pulse">Memuat Data Pasar...</span>
-                                    </div>
+                                    <div className="flex flex-col items-center gap-3"><div className="spinner"></div><span className="text-gray-400 text-sm font-medium animate-pulse">Memuat Data Pasar...</span></div>
                                 )}
                             </div>
                         </div>
@@ -440,22 +582,18 @@
                                 <div className="flex justify-between items-center mb-5">
                                     <span className="font-bold text-white text-lg">Swap</span>
                                     <div className="flex gap-3 text-gray-400">
-                                        <button onClick={() => { setChartData([]); fetchMarketData(); }} className="hover:text-blue-400 transition-colors bg-gray-800/50 p-2 rounded-lg"><IconRefresh /></button>
+                                        <button onClick={() => { setChartData([]); fetchMarketData(); addToast('Chart refreshed', 'info'); }} className="hover:text-blue-400 transition-colors bg-gray-800/50 p-2 rounded-lg"><IconRefresh /></button>
                                         <button className="hover:text-blue-400 transition-colors bg-gray-800/50 p-2 rounded-lg"><IconSettings /></button>
                                     </div>
                                 </div>
 
-                                {/* INPUT */}
                                 <div className="bg-[#0b0e14] rounded-xl p-4 border border-gray-800 hover:border-gray-600 transition-all duration-300 focus-within:border-blue-500/50 focus-within:ring-1 focus-within:ring-blue-500/20">
                                     <div className="flex justify-between text-xs font-medium text-gray-400 mb-2">
                                         <span>Jual</span>
                                         <span className="text-blue-400 cursor-pointer hover:text-blue-300">Max: {walletConnected ? '1.45' : '0'}</span>
                                     </div>
                                     <div className="flex justify-between items-center gap-3">
-                                        <input 
-                                            type="number" placeholder="0" value={inputAmount} onChange={(e) => setInputAmount(e.target.value)}
-                                            className="bg-transparent text-3xl font-bold text-white outline-none w-full placeholder-gray-700"
-                                        />
+                                        <input type="number" placeholder="0" value={inputAmount} onChange={(e) => setInputAmount(e.target.value)} className="bg-transparent text-3xl font-bold text-white outline-none w-full placeholder-gray-700" />
                                         <div className="flex items-center gap-2 bg-[#1f2937] px-3 py-1.5 rounded-full shrink-0 border border-gray-700 hover:bg-gray-700 cursor-pointer transition-colors">
                                             <span className="font-bold text-sm sm:text-base">{inputToken}</span>
                                             <IconChevronDown />
@@ -466,24 +604,17 @@
                                     </div>
                                 </div>
 
-                                {/* ARROW */}
                                 <div className="relative h-4 z-10 my-[-10px]">
-                                    <button onClick={switchTokens} className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#131a2a] border-4 border-[#131a2a] p-2 rounded-xl text-gray-400 hover:text-blue-400 hover:bg-gray-800 transition-all shadow-lg hover:scale-110 active:scale-95">
-                                        <IconArrowDownUp />
-                                    </button>
+                                    <button onClick={switchTokens} className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#131a2a] border-4 border-[#131a2a] p-2 rounded-xl text-gray-400 hover:text-blue-400 hover:bg-gray-800 transition-all shadow-lg hover:scale-110 active:scale-95"><IconArrowDownUp /></button>
                                 </div>
 
-                                {/* OUTPUT */}
                                 <div className="bg-[#0b0e14] rounded-xl p-4 border border-gray-800 hover:border-gray-600 transition-colors mt-2 mb-6">
                                     <div className="flex justify-between text-xs font-medium text-gray-400 mb-2">
                                         <span>Terima</span>
                                         <span>Bal: {walletConnected ? '500.00' : '0'}</span>
                                     </div>
                                     <div className="flex justify-between items-center gap-3">
-                                        <input 
-                                            type="text" placeholder="0" value={outputAmount} readOnly
-                                            className="bg-transparent text-3xl font-bold text-white outline-none w-full placeholder-gray-700 cursor-default"
-                                        />
+                                        <input type="text" placeholder="0" value={outputAmount} readOnly className="bg-transparent text-3xl font-bold text-white outline-none w-full placeholder-gray-700 cursor-default" />
                                         <div className="flex items-center gap-2 bg-[#1f2937] px-3 py-1.5 rounded-full shrink-0 border border-gray-700 hover:bg-gray-700 cursor-pointer transition-colors">
                                             <span className="font-bold text-sm sm:text-base">{outputToken}</span>
                                             <IconChevronDown />
@@ -495,10 +626,9 @@
                                     </div>
                                 </div>
 
-                                {/* BUTTON */}
                                 <button 
-                                    onClick={() => !walletConnected ? toggleConnect() : handleSwap()}
-                                    disabled={isSwapping || (walletConnected && !inputAmount)}
+                                    onClick={initiateSwap}
+                                    disabled={isApproved ? false : (walletConnected && !inputAmount)}
                                     className={`w-full py-4 rounded-xl font-bold text-lg transition-all shadow-xl active:scale-[0.98] ${
                                         !walletConnected 
                                             ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/30' 
@@ -507,17 +637,16 @@
                                                 : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg'
                                     }`}
                                 >
-                                    {isSwapping 
-                                        ? <span className="flex items-center justify-center gap-2"><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/> Menukar...</span>
-                                        : !walletConnected 
-                                            ? 'Hubungkan Dompet' 
-                                            : !inputAmount 
-                                                ? 'Masukkan Jumlah' 
-                                                : 'Tukar Sekarang'}
+                                    {!walletConnected 
+                                        ? 'Hubungkan Dompet' 
+                                        : !inputAmount 
+                                            ? 'Masukkan Jumlah' 
+                                            : inputToken !== 'ETH' && !isApproved 
+                                                ? `Approve ${inputToken}` 
+                                                : 'Swap Sekarang'}
                                 </button>
                             </div>
                         </div>
-
                     </main>
                 </div>
             );
